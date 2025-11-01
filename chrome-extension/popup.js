@@ -1,3 +1,18 @@
+// Set default date to today
+const today = new Date();
+document.getElementById('pastMatchesDate').valueAsDate = today;
+
+// Load cached history matches preference
+const cachedHistoryMatches = localStorage.getItem('historyMatches');
+if (cachedHistoryMatches) {
+  document.getElementById('historyMatches').value = cachedHistoryMatches;
+}
+
+// Save history matches preference when changed
+document.getElementById('historyMatches').addEventListener('input', (e) => {
+  localStorage.setItem('historyMatches', e.target.value);
+});
+
 document.getElementById('fetchBtn').addEventListener('click', async () => {
   const button = document.getElementById('fetchBtn');
   const status = document.getElementById('status');
@@ -35,47 +50,120 @@ document.getElementById('fetchBtn').addEventListener('click', async () => {
 async function fetchAndExportWithHistories(tab) {
   showStatus('Fetching tournament events...', 'info');
   
+  // Get user preference for past matches date
+  const pastMatchesDate = document.getElementById('pastMatchesDate').value;
+  
   const [result] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
-    func: async () => {
+    func: async (dateString) => {
       const urlMatch = window.location.href.match(/\/tournament\/.*\/(\d+)/);
       if (!urlMatch) return { error: 'Could not find tournament ID in URL' };
       
       const tournamentId = urlMatch[1];
       
       try {
-        const [pastResponse, upcomingResponse] = await Promise.all([
-          fetch(`https://www.sofascore.com/api/v1/unique-tournament/${tournamentId}/events/last/0`, {
+        // Fetch past events with date filtering
+        let allPastEvents = [];
+        let pastPage = 0;
+        let hasPastPages = true;
+        // Create cutoff date at start of day in local timezone
+        let cutoffDate = null;
+        if (dateString) {
+          const selectedDate = new Date(dateString + 'T00:00:00');
+          cutoffDate = selectedDate.getTime();
+        }
+        
+        while (hasPastPages) {
+          const pastResponse = await fetch(`https://www.sofascore.com/api/v1/unique-tournament/${tournamentId}/events/last/${pastPage}`, {
             headers: { 
               'accept': '*/*', 
               'cache-control': 'max-age=0',
               'x-requested-with': '4ecab9'
             }
-          }),
-          fetch(`https://www.sofascore.com/api/v1/unique-tournament/${tournamentId}/events/next/0`, {
+          });
+          
+          if (pastResponse.ok) {
+            const pastData = await pastResponse.json();
+            
+            if (pastData.events && pastData.events.length > 0) {
+              let eventsToAdd = pastData.events;
+              
+              // Filter by date if cutoffDate is set
+              if (cutoffDate) {
+                eventsToAdd = eventsToAdd.filter(event => {
+                  const eventTime = event.startTimestamp * 1000;
+                  return eventTime >= cutoffDate;
+                });
+                
+                // If we found events older than cutoff, stop pagination
+                const hasOlderEvents = pastData.events.some(event => {
+                  const eventTime = event.startTimestamp * 1000;
+                  return eventTime < cutoffDate;
+                });
+                
+                if (hasOlderEvents) {
+                  allPastEvents = allPastEvents.concat(eventsToAdd);
+                  hasPastPages = false;
+                  break;
+                }
+              }
+              
+              allPastEvents = allPastEvents.concat(eventsToAdd);
+              hasPastPages = pastData.hasNextPage || false;
+              pastPage++;
+              
+              if (hasPastPages) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
+            } else {
+              hasPastPages = false;
+            }
+          } else {
+            hasPastPages = false;
+          }
+        }
+        
+        // Fetch ALL upcoming events with pagination
+        let allUpcomingEvents = [];
+        let page = 0;
+        let hasMorePages = true;
+        
+        while (hasMorePages) {
+          const upcomingResponse = await fetch(`https://www.sofascore.com/api/v1/unique-tournament/${tournamentId}/events/next/${page}`, {
             headers: { 
               'accept': '*/*', 
               'cache-control': 'max-age=0',
               'x-requested-with': 'e518f8'
             }
-          })
-        ]);
-        
-        if (!pastResponse.ok && !upcomingResponse.ok) {
-          throw new Error(`HTTP ${pastResponse.status} / ${upcomingResponse.status}`);
+          });
+          
+          if (upcomingResponse.ok) {
+            const upcomingData = await upcomingResponse.json();
+            if (upcomingData.events && upcomingData.events.length > 0) {
+              allUpcomingEvents = allUpcomingEvents.concat(upcomingData.events);
+              hasMorePages = upcomingData.hasNextPage || false;
+              page++;
+              
+              if (hasMorePages) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
+            } else {
+              hasMorePages = false;
+            }
+          } else {
+            hasMorePages = false;
+          }
         }
         
-        const pastData = pastResponse.ok ? await pastResponse.json() : { events: [] };
-        const upcomingData = upcomingResponse.ok ? await upcomingResponse.json() : { events: [] };
-        
         return {
-          pastEvents: pastData.events || [],
-          upcomingEvents: upcomingData.events || []
+          pastEvents: allPastEvents,
+          upcomingEvents: allUpcomingEvents
         };
       } catch (error) {
         return { error: error.message };
       }
-    }
+    },
+    args: [pastMatchesDate]
   });
   
   const data = result.result;
@@ -106,6 +194,19 @@ function showStatus(message, type) {
   status.textContent = message;
   status.className = type;
   status.style.display = 'block';
+}
+
+function formatDate(isoString) {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  return date.toLocaleString('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
 }
 
 function safeNum(v) {
@@ -330,7 +431,7 @@ async function exportWithPlayerHistories(events, tab) {
     'Total Points': row.totalPoints,
     'Sets Played': row.setsPlayed,
     'Status': row.status,
-    'Start Time': row.startTime,
+    'Start Time': formatDate(row.startTime),
     'Home Set 1': row.homeSet1 !== null ? row.homeSet1 : '',
     'Home Set 2': row.homeSet2 !== null ? row.homeSet2 : '',
     'Home Set 3': row.homeSet3 !== null ? row.homeSet3 : '',
@@ -390,7 +491,7 @@ async function exportWithPlayerHistories(events, tab) {
           'Away Points': awayTotal,
           'Total Points': homeTotal + awayTotal,
           'Status': event.status.description,
-          'Start Time': event.startTimestamp ? new Date(event.startTimestamp * 1000).toISOString() : '',
+          'Start Time': formatDate(event.startTimestamp ? new Date(event.startTimestamp * 1000).toISOString() : ''),
           'Home Set 1': getSetScore(homeScore, 1),
           'Home Set 2': getSetScore(homeScore, 2),
           'Home Set 3': getSetScore(homeScore, 3),
