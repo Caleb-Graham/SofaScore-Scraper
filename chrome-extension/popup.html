@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      body {
+        width: 400px;
+        padding: 15px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #1a2332;
+        color: #e8e8e8;
+      }
+      h2 {
+        margin: 0 0 15px 0;
+        font-size: 16px;
+        color: #ff7b7b;
+      }
+      .input-group {
+        margin-bottom: 15px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 12px;
+        color: #a0a0a0;
+      }
+      input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #3d4a5c;
+        background: #253447;
+        color: #e8e8e8;
+        border-radius: 3px;
+        box-sizing: border-box;
+        font-size: 13px;
+      }
+      button {
+        width: 100%;
+        padding: 10px;
+        background: #ff7b7b;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      button:hover {
+        background: #ff9191;
+      }
+      button:disabled {
+        background: #555;
+        cursor: not-allowed;
+        color: #888;
+      }
+      #status {
+        margin-top: 15px;
+        padding: 10px;
+        border-radius: 3px;
+        font-size: 12px;
+        display: none;
+      }
+      #status.success {
+        background: #1e3a2a;
+        color: #85e0a3;
+        border: 1px solid #2d5a3d;
+      }
+      #status.error {
+        background: #3a1e1e;
+        color: #ff9191;
+        border: 1px solid #5a2d2d;
+      }
+      #status.info {
+        background: #2a2e3a;
+        color: #c09870;
+        border: 1px solid #3d4a5c;
+      }
+      .match-item {
+        background: #253447;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 3px;
+        border-left: 3px solid #c09870;
+      }
+      .match-item.over {
+        border-left-color: #85e0a3;
+      }
+      .match-item.under {
+        border-left-color: #ff7b7b;
+      }
+      .match-header {
+        font-weight: bold;
+        margin-bottom: 5px;
+        color: #ff9191;
+      }
+      .match-detail {
+        font-size: 11px;
+        color: #a0a0a0;
+        margin: 3px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>🏓 SofaScore Scraper</h2>
+
+    <p style="font-size: 12px; color: #999; margin-bottom: 15px">
+      Navigate to a SofaScore tournament page to export data.
+    </p>
+
+    <button id="fetchBtn">Fetch TT Elite Series</button>
+
+    <div id="status"></div>
+
+    <script src="xlsx.full.min.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

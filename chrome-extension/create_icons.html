@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <canvas id="canvas16" width="16" height="16"></canvas>
+    <canvas id="canvas48" width="48" height="48"></canvas>
+    <canvas id="canvas128" width="128" height="128"></canvas>
+    <script>
+      function createIcon(canvasId, size) {
+        const canvas = document.getElementById(canvasId);
+        const ctx = canvas.getContext("2d");
+
+        // Background gradient
+        const gradient = ctx.createLinearGradient(0, 0, size, size);
+        gradient.addColorStop(0, "#0e639c");
+        gradient.addColorStop(1, "#1177bb");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, size, size);
+
+        // Table tennis paddle
+        const paddleSize = size * 0.35;
+        const paddleX = size * 0.3;
+        const paddleY = size * 0.25;
+
+        // Paddle face (circle)
+        ctx.fillStyle = "#ff4444";
+        ctx.beginPath();
+        ctx.arc(paddleX, paddleY, paddleSize, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Paddle handle
+        ctx.fillStyle = "#8B4513";
+        ctx.fillRect(
+          paddleX - paddleSize * 0.15,
+          paddleY + paddleSize * 0.7,
+          paddleSize * 0.3,
+          paddleSize * 0.8
+        );
+
+        // Ball
+        const ballSize = size * 0.12;
+        const ballX = size * 0.7;
+        const ballY = size * 0.7;
+
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Motion lines behind ball
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+        ctx.lineWidth = size * 0.02;
+        ctx.beginPath();
+        ctx.moveTo(ballX - ballSize * 2, ballY);
+        ctx.lineTo(ballX - ballSize, ballY);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(ballX - ballSize * 2.5, ballY - ballSize * 0.5);
+        ctx.lineTo(ballX - ballSize * 1.2, ballY - ballSize * 0.5);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(ballX - ballSize * 2.5, ballY + ballSize * 0.5);
+        ctx.lineTo(ballX - ballSize * 1.2, ballY + ballSize * 0.5);
+        ctx.stroke();
+
+        // Data/chart icon in corner
+        if (size >= 48) {
+          const chartSize = size * 0.15;
+          const chartX = size * 0.85;
+          const chartY = size * 0.15;
+
+          ctx.fillStyle = "rgba(137, 209, 133, 0.9)";
+          ctx.fillRect(
+            chartX - chartSize,
+            chartY,
+            chartSize * 0.3,
+            chartSize * 0.6
+          );
+          ctx.fillRect(
+            chartX - chartSize * 0.5,
+            chartY + chartSize * 0.2,
+            chartSize * 0.3,
+            chartSize * 0.8
+          );
+          ctx.fillRect(
+            chartX,
+            chartY + chartSize * 0.4,
+            chartSize * 0.3,
+            chartSize
+          );
+        }
+
+        // Download
+        canvas.toBlob((blob) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `icon${size}.png`;
+          a.click();
+        });
+      }
+
+      createIcon("canvas16", 16);
+      createIcon("canvas48", 48);
+      createIcon("canvas128", 128);
+    </script>
+  </body>
+</html>

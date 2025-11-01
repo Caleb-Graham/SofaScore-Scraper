@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "SofaScore Data Scraper",
+  "version": "1.0",
+  "description": "Extract match data from SofaScore",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "assets/dollar-pong-16.png",
+      "48": "assets/dollar-pong-48.png",
+      "128": "assets/dollar-pong-128.png"
+    }
+  },
+  "icons": {
+    "16": "assets/dollar-pong-16.png",
+    "48": "assets/dollar-pong-48.png",
+    "128": "assets/dollar-pong-128.png"
+  },
+  "host_permissions": [
+    "https://www.sofascore.com/*"
+  ]
+}
