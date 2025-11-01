@@ -189,6 +189,12 @@ function processEventData(data) {
 async function exportWithPlayerHistories(events, tab) {
   showStatus('Fetching all tournament matches...', 'info');
   
+  // Get user's history match preference
+  const historyMatchesInput = document.getElementById('historyMatches');
+  const maxMatches = parseInt(historyMatchesInput.value) || 200;
+  const eventsPerPage = 20; // SofaScore API returns exactly 20 events per page
+  const maxPages = Math.ceil(maxMatches / eventsPerPage);
+  
   // Track player IDs and start fetching their histories in parallel
   const playerIds = new Set();
   const playerNames = {};
@@ -200,9 +206,8 @@ async function exportWithPlayerHistories(events, tab) {
       let allPlayerEvents = [];
       let page = 0;
       let hasMorePages = true;
-      const maxPages = 5;
       
-      while (hasMorePages && page < maxPages) {
+      while (hasMorePages && page < maxPages && allPlayerEvents.length < maxMatches) {
         const result = await chrome.scripting.executeScript({
           target: { tabId: tab.id },
           func: async (pid, pageNum) => {
@@ -230,6 +235,11 @@ async function exportWithPlayerHistories(events, tab) {
         } else {
           hasMorePages = false;
         }
+      }
+      
+      // Trim to exact match count if we fetched more
+      if (allPlayerEvents.length > maxMatches) {
+        allPlayerEvents = allPlayerEvents.slice(0, maxMatches);
       }
       
       return { playerId, playerName, events: allPlayerEvents };
