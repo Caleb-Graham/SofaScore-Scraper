@@ -108,79 +108,81 @@ function showStatus(message, type) {
   status.style.display = 'block';
 }
 
+function safeNum(v) {
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function calculateSetStats(homeScore, awayScore, defaultPeriodCount = 5) {
+  const maxPeriods = Math.max(defaultPeriodCount, 7);
+  const sets = [];
+  
+  for (let i = 1; i <= maxPeriods; i++) {
+    const homeSetScore = safeNum(homeScore[`period${i}`]);
+    const awaySetScore = safeNum(awayScore[`period${i}`]);
+    
+    if (homeSetScore !== null || awaySetScore !== null) {
+      const home = homeSetScore !== null ? homeSetScore : 0;
+      const away = awaySetScore !== null ? awaySetScore : 0;
+      
+      sets.push({
+        period: i,
+        homeScore: homeSetScore,
+        awayScore: awaySetScore,
+        total: home + away,
+        isOver185: (home + away) >= 19
+      });
+    }
+  }
+  
+  return sets;
+}
+
 function processEventData(data) {
   const event = data.event;
-  
   if (!event) return null;
   
   const homeScore = event.homeScore || {};
   const awayScore = event.awayScore || {};
   
-  const homeTotal = (homeScore.period1 || 0) + (homeScore.period2 || 0) + 
-                     (homeScore.period3 || 0) + (homeScore.period4 || 0) + 
-                     (homeScore.period5 || 0) + (homeScore.period6 || 0) + 
-                     (homeScore.period7 || 0);
+  const sets = calculateSetStats(homeScore, awayScore, event.defaultPeriodCount);
   
-  const awayTotal = (awayScore.period1 || 0) + (awayScore.period2 || 0) + 
-                     (awayScore.period3 || 0) + (awayScore.period4 || 0) + 
-                     (awayScore.period5 || 0) + (awayScore.period6 || 0) + 
-                     (awayScore.period7 || 0);
+  const homeTotal = sets.reduce((sum, set) => sum + (set.homeScore || 0), 0);
+  const awayTotal = sets.reduce((sum, set) => sum + (set.awayScore || 0), 0);
   
-  const totalPoints = homeTotal + awayTotal;
-  const totalGames = (homeScore.current || 0) + (awayScore.current || 0);
-  
-  const setsPlayed = Math.max(
-    Object.keys(homeScore).filter(k => k.startsWith('period') && homeScore[k] != null).length,
-    Object.keys(awayScore).filter(k => k.startsWith('period') && awayScore[k] != null).length
-  );
-  
-  // Calculate over 18.5 for each game (set)
-  // A game is over 18.5 if the total points in that game > 18.5 (i.e., >= 19)
-  const sets = [];
-  for (let i = 1; i <= 7; i++) {
-    const homeSetScore = homeScore[`period${i}`] || 0;
-    const awaySetScore = awayScore[`period${i}`] || 0;
-    if (homeSetScore > 0 || awaySetScore > 0) {
-      sets.push({
-        total: homeSetScore + awaySetScore,
-        isOver185: (homeSetScore + awaySetScore) > 18.5
-      });
-    }
-  }
-  
-  const gamesOver185 = sets.filter(s => s.isOver185).length;
-  const gamesUnder185 = sets.filter(s => !s.isOver185).length;
+  const getSetScore = (scoreObj, period) => safeNum(scoreObj[`period${period}`]);
   
   return {
     eventId: event.id,
     homeTeam: event.homeTeam.name,
     awayTeam: event.awayTeam.name,
     tournament: event.tournament.name,
-    homeGames: homeScore.current || 0,
-    awayGames: awayScore.current || 0,
-    totalGames: totalGames,
+    homeGames: safeNum(homeScore.current) || 0,
+    awayGames: safeNum(awayScore.current) || 0,
+    totalGames: (safeNum(homeScore.current) || 0) + (safeNum(awayScore.current) || 0),
     homePoints: homeTotal,
     awayPoints: awayTotal,
-    totalPoints: totalPoints,
-    setsPlayed: setsPlayed,
-    gamesOver185: gamesOver185,
-    gamesUnder185: gamesUnder185,
+    totalPoints: homeTotal + awayTotal,
+    setsPlayed: sets.length,
+    gamesOver185: sets.filter(s => s.isOver185).length,
+    gamesUnder185: sets.filter(s => !s.isOver185).length,
     status: event.status.description,
     startTime: event.startTimestamp ? new Date(event.startTimestamp * 1000).toISOString() : '',
-    homeSet1: homeScore.period1 || 0,
-    homeSet2: homeScore.period2 || 0,
-    homeSet3: homeScore.period3 || 0,
-    homeSet4: homeScore.period4 || 0,
-    homeSet5: homeScore.period5 || 0,
-    homeSet6: homeScore.period6 || 0,
-    homeSet7: homeScore.period7 || 0,
-    awaySet1: awayScore.period1 || 0,
-    awaySet2: awayScore.period2 || 0,
-    awaySet3: awayScore.period3 || 0,
-    awaySet4: awayScore.period4 || 0,
-    awaySet5: awayScore.period5 || 0,
-    awaySet6: awayScore.period6 || 0,
-    awaySet7: awayScore.period7 || 0,
+    homeSet1: getSetScore(homeScore, 1),
+    homeSet2: getSetScore(homeScore, 2),
+    homeSet3: getSetScore(homeScore, 3),
+    homeSet4: getSetScore(homeScore, 4),
+    homeSet5: getSetScore(homeScore, 5),
+    homeSet6: getSetScore(homeScore, 6),
+    homeSet7: getSetScore(homeScore, 7),
+    awaySet1: getSetScore(awayScore, 1),
+    awaySet2: getSetScore(awayScore, 2),
+    awaySet3: getSetScore(awayScore, 3),
+    awaySet4: getSetScore(awayScore, 4),
+    awaySet5: getSetScore(awayScore, 5),
+    awaySet6: getSetScore(awayScore, 6),
+    awaySet7: getSetScore(awayScore, 7),
   };
 }
 
@@ -319,20 +321,20 @@ async function exportWithPlayerHistories(events, tab) {
     'Sets Played': row.setsPlayed,
     'Status': row.status,
     'Start Time': row.startTime,
-    'Home Set 1': row.homeSet1,
-    'Home Set 2': row.homeSet2,
-    'Home Set 3': row.homeSet3,
-    'Home Set 4': row.homeSet4,
-    'Home Set 5': row.homeSet5,
-    'Home Set 6': row.homeSet6,
-    'Home Set 7': row.homeSet7,
-    'Away Set 1': row.awaySet1,
-    'Away Set 2': row.awaySet2,
-    'Away Set 3': row.awaySet3,
-    'Away Set 4': row.awaySet4,
-    'Away Set 5': row.awaySet5,
-    'Away Set 6': row.awaySet6,
-    'Away Set 7': row.awaySet7
+    'Home Set 1': row.homeSet1 !== null ? row.homeSet1 : '',
+    'Home Set 2': row.homeSet2 !== null ? row.homeSet2 : '',
+    'Home Set 3': row.homeSet3 !== null ? row.homeSet3 : '',
+    'Home Set 4': row.homeSet4 !== null ? row.homeSet4 : '',
+    'Home Set 5': row.homeSet5 !== null ? row.homeSet5 : '',
+    'Home Set 6': row.homeSet6 !== null ? row.homeSet6 : '',
+    'Home Set 7': row.homeSet7 !== null ? row.homeSet7 : '',
+    'Away Set 1': row.awaySet1 !== null ? row.awaySet1 : '',
+    'Away Set 2': row.awaySet2 !== null ? row.awaySet2 : '',
+    'Away Set 3': row.awaySet3 !== null ? row.awaySet3 : '',
+    'Away Set 4': row.awaySet4 !== null ? row.awaySet4 : '',
+    'Away Set 5': row.awaySet5 !== null ? row.awaySet5 : '',
+    'Away Set 6': row.awaySet6 !== null ? row.awaySet6 : '',
+    'Away Set 7': row.awaySet7 !== null ? row.awaySet7 : ''
   })));
   
   XLSX.utils.book_append_sheet(wb, tournamentSheet, 'Tournament Matches');
@@ -352,65 +354,49 @@ async function exportWithPlayerHistories(events, tab) {
       const playerHistory = [];
       for (const event of playerEvents) {
         const homeScore = event.homeScore || {};
-          const awayScore = event.awayScore || {};
-          
-          const homeTotal = (homeScore.period1 || 0) + (homeScore.period2 || 0) + 
-                           (homeScore.period3 || 0) + (homeScore.period4 || 0) + 
-                           (homeScore.period5 || 0) + (homeScore.period6 || 0) + 
-                           (homeScore.period7 || 0);
-          
-          const awayTotal = (awayScore.period1 || 0) + (awayScore.period2 || 0) + 
-                           (awayScore.period3 || 0) + (awayScore.period4 || 0) + 
-                           (awayScore.period5 || 0) + (awayScore.period6 || 0) + 
-                           (awayScore.period7 || 0);
-          
-          // Calculate over 18.5 for each game
-          const sets = [];
-          for (let i = 1; i <= 7; i++) {
-            const homeSetScore = homeScore[`period${i}`] || 0;
-            const awaySetScore = awayScore[`period${i}`] || 0;
-            if (homeSetScore > 0 || awaySetScore > 0) {
-              sets.push({
-                total: homeSetScore + awaySetScore,
-                isOver185: (homeSetScore + awaySetScore) > 18.5
-              });
-            }
-          }
-          
-          const gamesOver185 = sets.filter(s => s.isOver185).length;
-          const gamesUnder185 = sets.filter(s => !s.isOver185).length;
-          
-          playerHistory.push({
-            'Event ID': event.id,
-            'Home Team': event.homeTeam.name,
-            'Away Team': event.awayTeam.name,
-            'Tournament': event.tournament.name,
-            'Home Games': homeScore.current || 0,
-            'Away Games': awayScore.current || 0,
-            'Total Games': (homeScore.current || 0) + (awayScore.current || 0),
-            'Games Over 18.5': gamesOver185,
-            'Games Under 18.5': gamesUnder185,
-            'Home Points': homeTotal,
-            'Away Points': awayTotal,
-            'Total Points': homeTotal + awayTotal,
-            'Status': event.status.description,
-            'Start Time': event.startTimestamp ? new Date(event.startTimestamp * 1000).toISOString() : '',
-            'Home Set 1': homeScore.period1 || 0,
-            'Home Set 2': homeScore.period2 || 0,
-            'Home Set 3': homeScore.period3 || 0,
-            'Home Set 4': homeScore.period4 || 0,
-            'Home Set 5': homeScore.period5 || 0,
-            'Home Set 6': homeScore.period6 || 0,
-            'Home Set 7': homeScore.period7 || 0,
-            'Away Set 1': awayScore.period1 || 0,
-            'Away Set 2': awayScore.period2 || 0,
-            'Away Set 3': awayScore.period3 || 0,
-            'Away Set 4': awayScore.period4 || 0,
-            'Away Set 5': awayScore.period5 || 0,
-            'Away Set 6': awayScore.period6 || 0,
-            'Away Set 7': awayScore.period7 || 0
-          });
-        }
+        const awayScore = event.awayScore || {};
+        
+        const sets = calculateSetStats(homeScore, awayScore, event.defaultPeriodCount);
+        
+        const homeTotal = sets.reduce((sum, set) => sum + (set.homeScore || 0), 0);
+        const awayTotal = sets.reduce((sum, set) => sum + (set.awayScore || 0), 0);
+        
+        const getSetScore = (scoreObj, period) => {
+          const score = safeNum(scoreObj[`period${period}`]);
+          return score !== null ? score : '';
+        };
+        
+        playerHistory.push({
+          'Event ID': event.id,
+          'Home Team': event.homeTeam.name,
+          'Away Team': event.awayTeam.name,
+          'Tournament': event.tournament.name,
+          'Home Games': safeNum(homeScore.current) || 0,
+          'Away Games': safeNum(awayScore.current) || 0,
+          'Total Games': (safeNum(homeScore.current) || 0) + (safeNum(awayScore.current) || 0),
+          'Games Over 18.5': sets.filter(s => s.isOver185).length,
+          'Games Under 18.5': sets.filter(s => !s.isOver185).length,
+          'Home Points': homeTotal,
+          'Away Points': awayTotal,
+          'Total Points': homeTotal + awayTotal,
+          'Status': event.status.description,
+          'Start Time': event.startTimestamp ? new Date(event.startTimestamp * 1000).toISOString() : '',
+          'Home Set 1': getSetScore(homeScore, 1),
+          'Home Set 2': getSetScore(homeScore, 2),
+          'Home Set 3': getSetScore(homeScore, 3),
+          'Home Set 4': getSetScore(homeScore, 4),
+          'Home Set 5': getSetScore(homeScore, 5),
+          'Home Set 6': getSetScore(homeScore, 6),
+          'Home Set 7': getSetScore(homeScore, 7),
+          'Away Set 1': getSetScore(awayScore, 1),
+          'Away Set 2': getSetScore(awayScore, 2),
+          'Away Set 3': getSetScore(awayScore, 3),
+          'Away Set 4': getSetScore(awayScore, 4),
+          'Away Set 5': getSetScore(awayScore, 5),
+          'Away Set 6': getSetScore(awayScore, 6),
+          'Away Set 7': getSetScore(awayScore, 7)
+        });
+      }
         
         // Sort player history by date descending
         playerHistory.sort((a, b) => {
