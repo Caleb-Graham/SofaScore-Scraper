@@ -4,13 +4,18 @@ A Chrome extension to extract comprehensive match data and player histories from
 
 ## Installation
 
-1. Clone or download this repository:
+1. Download this repository:
+
+   - Go to https://github.com/Caleb-Graham/SofaScore-Scraper
+   - Click the green "Code" button
+   - Select "Download ZIP"
+   - Extract the ZIP file to a location on your computer
+
+   Or clone with git:
 
    ```bash
    git clone https://github.com/Caleb-Graham/SofaScore-Scraper.git
    ```
-
-   Or download as ZIP and extract it
 
 2. Open Chrome and navigate to `chrome://extensions/`
 3. Enable "Developer mode" (toggle in top right)
