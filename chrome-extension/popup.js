@@ -182,11 +182,20 @@ async function fetchAndExportWithHistories(tab) {
   
   showStatus(`Found ${data.pastEvents?.length || 0} past and ${data.upcomingEvents?.length || 0} upcoming events. Starting export...`, 'info');
   
-  // Combine all events
+  // Combine all events and remove duplicates by event ID
   const allEvents = [...(data.pastEvents || []), ...(data.upcomingEvents || [])];
+  const uniqueEvents = [];
+  const seenEventIds = new Set();
+  
+  for (const event of allEvents) {
+    if (!seenEventIds.has(event.id)) {
+      seenEventIds.add(event.id);
+      uniqueEvents.push(event);
+    }
+  }
   
   // Immediately export with player histories
-  await exportWithPlayerHistories(allEvents, tab);
+  await exportWithPlayerHistories(uniqueEvents, tab);
 }
 
 function showStatus(message, type) {
@@ -451,7 +460,10 @@ async function exportWithPlayerHistories(events, tab) {
   XLSX.utils.book_append_sheet(wb, tournamentSheet, 'Tournament Matches');
   
   // Process player histories (already fetched in parallel)
+  // playerHistories is already unique by player ID from how we built playerHistoryPromises Map
   let playerCount = 0;
+  const usedSheetNames = new Set(['Tournament Matches']);
+  
   for (const playerHistoryData of playerHistories) {
     playerCount++;
     const { playerId, playerName, events: allPlayerEvents } = playerHistoryData;
@@ -517,7 +529,18 @@ async function exportWithPlayerHistories(events, tab) {
         });
         
         // Add player sheet (sheet names limited to 31 chars)
-        const sheetName = playerName.substring(0, 31);
+        // Handle duplicate names by adding player ID suffix
+        let baseSheetName = playerName.substring(0, 31);
+        let sheetName = baseSheetName;
+        
+        // If sheet name already exists, add last 4 digits of player ID
+        if (usedSheetNames.has(sheetName)) {
+          const idSuffix = ` (${String(playerId).slice(-4)})`;
+          const maxBaseLength = 31 - idSuffix.length;
+          sheetName = `${playerName.substring(0, maxBaseLength)}${idSuffix}`;
+        }
+        usedSheetNames.add(sheetName);
+        
         const playerSheet = XLSX.utils.json_to_sheet(playerHistory);
         XLSX.utils.book_append_sheet(wb, playerSheet, sheetName);
         
