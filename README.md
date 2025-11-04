@@ -24,13 +24,15 @@ A Chrome extension to extract comprehensive match data and player histories from
 
 ## Usage
 
-1. Navigate to a SofaScore tournament page (e.g., https://www.sofascore.com/tournament/table-tennis/poland/tt-elite-series/19041)
+1. Navigate to any SofaScore page (e.g., https://www.sofascore.com/)
 2. Click the extension icon in your toolbar
-3. Click "Fetch TT Elite Series"
-4. The extension will automatically:
-   - Fetch all past and upcoming tournament events
+3. Select a date from the date picker (defaults to today)
+4. Optionally adjust the number of past matches to fetch per player (default: 200)
+5. Click "Fetch TT Elite Series"
+6. The extension will automatically:
+   - Fetch all TT Elite Series matches for the selected date
    - Retrieve detailed statistics for each match
-   - Fetch complete match history for each player in the tournament
+   - Fetch complete match history for each player
    - Export everything to a single Excel file with multiple sheets
 
 ## Exported Data
@@ -63,13 +65,16 @@ For each unique player in the tournament:
 
 ## Features
 
+- ✅ Date-based filtering - select any date to fetch TT Elite Series matches
+- ✅ Automatic tournament filtering - only extracts TT Elite Series events from all table tennis data
 - ✅ One-click export - automatically fetches and exports everything
 - ✅ Comprehensive player histories included
-- ✅ Parallel data fetching for faster performance
+- ✅ Highly optimized parallel data fetching for fast performance
 - ✅ Excel format with multiple sheets for easy analysis
 - ✅ Real-time progress updates
 - ✅ Calculates over/under 18.5 points per game
-- ✅ Works on all SofaScore tournament pages
+- ✅ Configurable match history depth per player
+- ✅ Intelligent browser caching for efficiency
 - ✅ Dark theme UI with ping pong theme 🏓💰
 
 ## Use Cases
@@ -82,4 +87,4 @@ For each unique player in the tournament:
 
 ## Note
 
-This extension only works on sofascore.com tournament pages.
+This extension specifically targets the TT Elite Series tournament from SofaScore's table tennis API. It requires an active sofascore.com page to be open to fetch data.

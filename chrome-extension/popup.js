@@ -29,14 +29,6 @@ document.getElementById('fetchBtn').addEventListener('click', async () => {
       return;
     }
     
-    const isTournamentPage = tab.url.includes('/tournament/');
-    
-    if (!isTournamentPage) {
-      showStatus('Please navigate to a tournament page', 'error');
-      return;
-    }
-    
-    // Automatically fetch and export with player histories
     await fetchAndExportWithHistories(tab);
     
   } catch (error) {
@@ -48,7 +40,7 @@ document.getElementById('fetchBtn').addEventListener('click', async () => {
 });
 
 async function fetchAndExportWithHistories(tab) {
-  showStatus('Fetching tournament events...', 'info');
+  showStatus('Fetching tournament matches...', 'info');
   
   // Get user preference for past matches date
   const pastMatchesDate = document.getElementById('pastMatchesDate').value;
@@ -56,108 +48,43 @@ async function fetchAndExportWithHistories(tab) {
   const [result] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: async (dateString) => {
-      const urlMatch = window.location.href.match(/\/tournament\/.*\/(\d+)/);
-      if (!urlMatch) return { error: 'Could not find tournament ID in URL' };
-      
-      const tournamentId = urlMatch[1];
-      
       try {
-        // Fetch past events with date filtering
-        let allPastEvents = [];
-        let pastPage = 0;
-        let hasPastPages = true;
-        // Create cutoff date at start of day in local timezone
-        let cutoffDate = null;
-        if (dateString) {
-          const selectedDate = new Date(dateString + 'T00:00:00');
-          cutoffDate = selectedDate.getTime();
+        let allEvents = [];
+        
+        // Format date as YYYY-MM-DD for the API
+        let dateFormatted = dateString;
+        if (!dateFormatted) {
+          const today = new Date();
+          dateFormatted = today.toISOString().split('T')[0];
         }
         
-        while (hasPastPages) {
-          const pastResponse = await fetch(`https://www.sofascore.com/api/v1/unique-tournament/${tournamentId}/events/last/${pastPage}`, {
-            headers: { 
-              'accept': '*/*', 
-              'cache-control': 'max-age=0',
-              'x-requested-with': '4ecab9'
-            }
-          });
+        const scheduledEventsUrl = `https://www.sofascore.com/api/v1/sport/table-tennis/scheduled-events/${dateFormatted}`;
+        
+        const response = await fetch(scheduledEventsUrl, {
+          headers: { 
+            'accept': '*/*', 
+            'x-requested-with': '1f6364'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
           
-          if (pastResponse.ok) {
-            const pastData = await pastResponse.json();
+          if (data.events && data.events.length > 0) {
+            const ttEliteEvents = data.events.filter(event => {
+              const tournamentSlug = event.tournament?.slug || '';
+              return tournamentSlug === 'tt-elite-series';
+            });
             
-            if (pastData.events && pastData.events.length > 0) {
-              let eventsToAdd = pastData.events;
-              
-              // Filter by date if cutoffDate is set
-              if (cutoffDate) {
-                eventsToAdd = eventsToAdd.filter(event => {
-                  const eventTime = event.startTimestamp * 1000;
-                  return eventTime >= cutoffDate;
-                });
-                
-                // If we found events older than cutoff, stop pagination
-                const hasOlderEvents = pastData.events.some(event => {
-                  const eventTime = event.startTimestamp * 1000;
-                  return eventTime < cutoffDate;
-                });
-                
-                if (hasOlderEvents) {
-                  allPastEvents = allPastEvents.concat(eventsToAdd);
-                  hasPastPages = false;
-                  break;
-                }
-              }
-              
-              allPastEvents = allPastEvents.concat(eventsToAdd);
-              hasPastPages = pastData.hasNextPage || false;
-              pastPage++;
-              
-              if (hasPastPages) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-              }
-            } else {
-              hasPastPages = false;
-            }
-          } else {
-            hasPastPages = false;
+            allEvents = ttEliteEvents;
           }
-        }
-        
-        // Fetch ALL upcoming events with pagination
-        let allUpcomingEvents = [];
-        let page = 0;
-        let hasMorePages = true;
-        
-        while (hasMorePages) {
-          const upcomingResponse = await fetch(`https://www.sofascore.com/api/v1/unique-tournament/${tournamentId}/events/next/${page}`, {
-            headers: { 
-              'accept': '*/*', 
-              'cache-control': 'max-age=0',
-              'x-requested-with': 'e518f8'
-            }
-          });
-          
-          if (upcomingResponse.ok) {
-            const upcomingData = await upcomingResponse.json();
-            if (upcomingData.events && upcomingData.events.length > 0) {
-              allUpcomingEvents = allUpcomingEvents.concat(upcomingData.events);
-              hasMorePages = upcomingData.hasNextPage || false;
-              page++;
-              
-              if (hasMorePages) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-              }
-            } else {
-              hasMorePages = false;
-            }
-          } else {
-            hasMorePages = false;
-          }
+        } else {
+          return { error: `Failed to fetch events: ${response.statusText}` };
         }
         
         return {
-          pastEvents: allPastEvents,
-          upcomingEvents: allUpcomingEvents
+          pastEvents: allEvents,
+          upcomingEvents: []
         };
       } catch (error) {
         return { error: error.message };
@@ -180,7 +107,7 @@ async function fetchAndExportWithHistories(tab) {
     return;
   }
   
-  showStatus(`Found ${data.pastEvents?.length || 0} past and ${data.upcomingEvents?.length || 0} upcoming events. Starting export...`, 'info');
+  showStatus(`Found ${data.pastEvents?.length || 0} TT Elite Series events. Starting export...`, 'info');
   
   // Combine all events and remove duplicates by event ID
   const allEvents = [...(data.pastEvents || []), ...(data.upcomingEvents || [])];
@@ -305,10 +232,21 @@ async function exportWithPlayerHistories(events, tab) {
   const eventsPerPage = 20; // SofaScore API returns exactly 20 events per page
   const maxPages = Math.ceil(maxMatches / eventsPerPage);
   
-  // Track player IDs and start fetching their histories in parallel
+  // Track player IDs and names
   const playerIds = new Set();
   const playerNames = {};
-  const playerHistoryPromises = new Map();
+  
+  // Collect all unique players from events first
+  for (const event of events) {
+    if (event.homeTeam?.id) {
+      playerIds.add(event.homeTeam.id);
+      playerNames[event.homeTeam.id] = event.homeTeam.name;
+    }
+    if (event.awayTeam?.id) {
+      playerIds.add(event.awayTeam.id);
+      playerNames[event.awayTeam.id] = event.awayTeam.name;
+    }
+  }
   
   // Function to fetch player history
   const fetchPlayerHistory = async (playerId, playerName) => {
@@ -322,7 +260,9 @@ async function exportWithPlayerHistories(events, tab) {
           target: { tabId: tab.id },
           func: async (pid, pageNum) => {
             const response = await fetch(`https://www.sofascore.com/api/v1/team/${pid}/events/last/${pageNum}`, {
-              headers: { 'x-requested-with': '3212e2' }
+              headers: { 
+                'x-requested-with': '3212e2'
+              }
             });
             return await response.json();
           },
@@ -337,7 +277,7 @@ async function exportWithPlayerHistories(events, tab) {
             page++;
             
             if (hasMorePages) {
-              await new Promise(resolve => setTimeout(resolve, 100));
+              await new Promise(resolve => setTimeout(resolve, 50));
             }
           } else {
             hasMorePages = false;
@@ -359,55 +299,41 @@ async function exportWithPlayerHistories(events, tab) {
     }
   };
   
-  // Fetch all event details
-  const allData = [];
-  for (let i = 0; i < events.length; i++) {
-    const event = events[i];
-    const matchName = `${event.homeTeam?.name || 'Unknown'} vs ${event.awayTeam?.name || 'Unknown'}`;
-    showStatus(`Fetching... ${matchName} (${i + 1}/${events.length})`, 'info');
-    
+  // Start fetching ALL player histories in parallel immediately
+  showStatus(`Found ${playerIds.size} unique players. Fetching match history...`, 'info');
+  const playerHistoryPromises = Array.from(playerIds).map(playerId => 
+    fetchPlayerHistory(playerId, playerNames[playerId])
+  );
+  
+  // Fetch all event details in parallel too
+  showStatus(`Fetching details for ${events.length} matches...`, 'info');
+  const eventDetailPromises = events.map(async (event, i) => {
     const result = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: async (eventId) => {
         const response = await fetch(`https://www.sofascore.com/api/v1/event/${eventId}`, {
-          headers: { 'x-requested-with': '3212e2' }
+          headers: { 
+            'x-requested-with': '3212e2'
+          }
         });
         return await response.json();
       },
-      args: [events[i].id]
+      args: [event.id]
     });
     
     if (result && result[0] && result[0].result) {
       const processed = processEventData(result[0].result);
       if (processed) {
-        // Add player IDs
         processed.homeTeamId = result[0].result.event.homeTeam.id;
         processed.awayTeamId = result[0].result.event.awayTeam.id;
-        allData.push(processed);
-        
-        // Start fetching player histories in parallel if we haven't already
-        if (processed.homeTeamId && !playerIds.has(processed.homeTeamId)) {
-          playerIds.add(processed.homeTeamId);
-          playerNames[processed.homeTeamId] = processed.homeTeam;
-          playerHistoryPromises.set(
-            processed.homeTeamId, 
-            fetchPlayerHistory(processed.homeTeamId, processed.homeTeam)
-          );
-        }
-        
-        if (processed.awayTeamId && !playerIds.has(processed.awayTeamId)) {
-          playerIds.add(processed.awayTeamId);
-          playerNames[processed.awayTeamId] = processed.awayTeam;
-          playerHistoryPromises.set(
-            processed.awayTeamId,
-            fetchPlayerHistory(processed.awayTeamId, processed.awayTeam)
-          );
-        }
+        return processed;
       }
     }
-    
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
+    return null;
+  });
+  
+  // Wait for all event details to complete
+  const allData = (await Promise.all(eventDetailPromises)).filter(d => d !== null);
   
   // Sort by date descending (most recent first)
   allData.sort((a, b) => {
@@ -416,10 +342,10 @@ async function exportWithPlayerHistories(events, tab) {
     return dateB - dateA;
   });
   
-  showStatus(`Found ${playerIds.size} unique players. Waiting for player histories...`, 'info');
+  showStatus(`Waiting for all ${playerIds.size} player histories to complete...`, 'info');
   
   // Wait for all player history fetches to complete
-  const playerHistories = await Promise.all(Array.from(playerHistoryPromises.values()));
+  const playerHistories = await Promise.all(playerHistoryPromises);
   
   // Create workbook
   const wb = XLSX.utils.book_new();
