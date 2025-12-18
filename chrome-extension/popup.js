@@ -8,9 +8,20 @@ if (cachedHistoryMatches) {
   document.getElementById('historyMatches').value = cachedHistoryMatches;
 }
 
+// Load cached tournament preference
+const cachedTournament = localStorage.getItem('tournament');
+if (cachedTournament) {
+  document.getElementById('tournament').value = cachedTournament;
+}
+
 // Save history matches preference when changed
 document.getElementById('historyMatches').addEventListener('input', (e) => {
   localStorage.setItem('historyMatches', e.target.value);
+});
+
+// Save tournament preference when changed
+document.getElementById('tournament').addEventListener('change', (e) => {
+  localStorage.setItem('tournament', e.target.value);
 });
 
 document.getElementById('fetchBtn').addEventListener('click', async () => {
@@ -29,17 +40,18 @@ document.getElementById('fetchBtn').addEventListener('click', async () => {
       return;
     }
     
-    await fetchAndExportWithHistories(tab);
+    const tournamentSlug = document.getElementById('tournament').value;
+    await fetchAndExportWithHistories(tab, tournamentSlug);
     
   } catch (error) {
     showStatus(`Error: ${error.message}`, 'error');
   } finally {
     button.disabled = false;
-    button.textContent = 'Fetch TT Elite Series';
+    button.textContent = 'Fetch Tournament';
   }
 });
 
-async function fetchAndExportWithHistories(tab) {
+async function fetchAndExportWithHistories(tab, tournamentSlug) {
   showStatus('Fetching tournament matches...', 'info');
   
   // Get user preference for past matches date
@@ -47,7 +59,7 @@ async function fetchAndExportWithHistories(tab) {
   
   const [result] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
-    func: async (dateString) => {
+    func: async (dateString, tournamentSlugParam) => {
       try {
         let allEvents = [];
         
@@ -71,12 +83,12 @@ async function fetchAndExportWithHistories(tab) {
           const data = await response.json();
           
           if (data.events && data.events.length > 0) {
-            const ttEliteEvents = data.events.filter(event => {
-              const tournamentSlug = event.tournament?.slug || '';
-              return tournamentSlug === 'tt-elite-series';
+            const tournamentEvents = data.events.filter(event => {
+              const eventTournamentSlug = event.tournament?.slug || '';
+              return eventTournamentSlug === tournamentSlugParam;
             });
             
-            allEvents = ttEliteEvents;
+            allEvents = tournamentEvents;
           }
         } else {
           return { error: `Failed to fetch events: ${response.statusText}` };
@@ -90,7 +102,7 @@ async function fetchAndExportWithHistories(tab) {
         return { error: error.message };
       }
     },
-    args: [pastMatchesDate]
+    args: [pastMatchesDate, tournamentSlug]
   });
   
   const data = result.result;
@@ -107,7 +119,8 @@ async function fetchAndExportWithHistories(tab) {
     return;
   }
   
-  showStatus(`Found ${data.pastEvents?.length || 0} TT Elite Series events. Starting export...`, 'info');
+  const tournamentName = tournamentSlug === 'tt-elite-series' ? 'TT Elite Series' : 'TT Cup';
+  showStatus(`Found ${data.pastEvents?.length || 0} ${tournamentName} events. Starting export...`, 'info');
   
   // Combine all events and remove duplicates by event ID
   const allEvents = [...(data.pastEvents || []), ...(data.upcomingEvents || [])];

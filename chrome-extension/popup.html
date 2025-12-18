@@ -37,6 +37,16 @@
       input[type="number"] {
         width: 100%;
       }
+      select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #3d4a5c;
+        background: #253447;
+        color: #e8e8e8;
+        border-radius: 3px;
+        box-sizing: border-box;
+        font-size: 13px;
+      }
       button {
         width: 100%;
         padding: 10px;
@@ -111,6 +121,14 @@
     </p>
 
     <div class="input-group">
+      <label for="tournament">Tournament</label>
+      <select id="tournament">
+        <option value="tt-elite-series">TT Elite Series</option>
+        <option value="tt-cup">TT Cup</option>
+      </select>
+    </div>
+
+    <div class="input-group">
       <label for="historyMatches">Player History (matches)</label>
       <input type="number" id="historyMatches" min="1" max="500" value="200" />
       <div style="font-size: 11px; color: #777; margin-top: 5px">
@@ -122,11 +140,11 @@
       <label for="pastMatchesDate">Tournament Date</label>
       <input type="date" id="pastMatchesDate" />
       <div style="font-size: 11px; color: #777; margin-top: 5px">
-        Date of desired TT Elite Series tournament
+        Date of desired tournament
       </div>
     </div>
 
-    <button id="fetchBtn">Fetch TT Elite Series</button>
+    <button id="fetchBtn">Fetch Tournament</button>
 
     <div id="status"></div>
 
